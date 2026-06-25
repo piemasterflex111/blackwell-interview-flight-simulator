@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+pydantic
+aiosqlite
+aiohttp
+openai
+websockets
+jinja2
+pytest

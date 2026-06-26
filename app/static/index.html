@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interview Flight Simulator</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #1a1a2e; color: #e0e0e0; }
+        .container { max-width: 800px; margin: 0 auto; padding: 20px; }
+        h1 { text-align: center; color: #4cc9f0; margin-bottom: 20px; }
+        .section { background: #16213e; border-radius: 8px; padding: 20px; margin-bottom: 20px; }
+        label { display: block; margin-bottom: 8px; color: #4cc9f0; }
+        textarea { width: 100%; height: 120px; background: #0f172a; color: #e0e0e0; border: 1px solid #334155; border-radius: 4px; padding: 10px; font-family: inherit; resize: vertical; }
+        select { width: 100%; padding: 10px; background: #0f172a; color: #e0e0e0; border: 1px solid #334155; border-radius: 4px; }
+        input[type=text] { width: 100%; padding: 10px; background: #0f172a; color: #e0e0e0; border: 1px solid #334155; border-radius: 4px; }
+        button { background: #4cc9f0; color: #0f172a; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: bold; margin: 5px; }
+        button:hover { background: #3a8fb7; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+        button.recording { background: #ef4444; color: white; animation: pulse 1s infinite; }
+        @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.6; } }
+        .question-display { background: #16213e; border-left: 4px solid #4cc9f0; padding: 15px; margin: 15px 0; font-size: 1.1em; white-space: pre-wrap; }
+        .score-display { text-align: center; font-size: 2em; font-weight: bold; margin: 10px 0; }
+        .score-good { color: #10b981; }
+        .score-bad { color: #ef4444; }
+        .feedback { margin: 10px 0; padding: 10px; background: #16213e; border-radius: 4px; }
+        .feedback strong { color: #4cc9f0; }
+        .status { text-align: center; padding: 10px; color: #64748b; }
+        .voice-status { text-align: center; padding: 8px; margin: 10px 0; border-radius: 4px; font-size: 0.9em; }
+        .voice-ok { background: #064e3b; color: #6ee7b7; }
+        .voice-err { background: #4c1d2b; color: #fca5a5; }
+        .btn-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+        .btn-row button { flex: 1; min-width: 140px; }
+        #answerArea { margin-top: 15px; }
+        #scoreArea { display: none; background: #0f172a; border-radius: 8px; padding: 15px; margin-top: 15px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Interview Flight Simulator</h1>
+
+        <!-- Setup section -->
+        <div class="section" id="setupSection">
+            <label for="jd">Job Description (paste text):</label>
+            <textarea id="jd" placeholder="Paste job description here..."></textarea>
+
+            <label for="role">Role Title:</label>
+            <input type="text" id="role" value="Python Automation Engineer">
+
+            <label for="mode">Interview Mode:</label>
+            <select id="mode">
+                <option value="recruiter_screen">Recruiter Screen</option>
+                <option value="hiring_manager">Hiring Manager</option>
+                <option value="technical_deep_dive" selected>Technical Deep Dive</option>
+                <option value="behavioral_star">Behavioral (STAR)</option>
+                <option value="system_design">System Design</option>
+                <option value="rapid_fire">Rapid Fire</option>
+                <option value="pressure_followup">Pressure Follow-up</option>
+            </select>
+
+            <button id="startBtn" onclick="startInterview()" style="width:100%;">Start Interview</button>
+            <div id="loadingMsg" style="display:none; text-align:center; padding:15px; color:#4cc9f0;">
+                Starting interview... generating first question (this takes ~10 seconds)
+            </div>
+        </div>
+
+        <!-- Interview section -->
+        <div class="section" id="interviewSection" style="display:none;">
+            <div class="status" id="status">Question 1</div>
+            <div id="question" class="question-display"></div>
+
+            <!-- Voice status bar -->
+            <div id="voiceStatus" class="voice-status" style="display:none;"></div>
+
+            <div id="answerArea">
+                <label for="answer">Your Answer:</label>
+                <textarea id="answer" placeholder="Type or speak your answer here..."></textarea>
+
+                <div class="btn-row">
+                    <button id="btnSpeakQuestion" onclick="speakText(document.getElementById('question').textContent)">Speak Question Again</button>
+                    <button id="btnStartMic" onclick="startListening()">Start Speaking</button>
+                    <button id="btnStopMic" onclick="stopListening()" style="display:none;">Stop Speaking</button>
+                </div>
+
+                <div class="btn-row" style="margin-top:15px;">
+                    <button id="submitBtn" onclick="submitAnswer()">Submit Answer</button>
+                </div>
+            </div>
+
+            <div id="scoreArea">
+                <div class="score-display" id="scoreDisplay"></div>
+                <div id="feedback"></div>
+                <button id="retryBtn" onclick="retryQuestion()" style="display:none;">Try Again</button>
+                <button id="nextBtn" onclick="nextQuestion()" style="display:none;">Next Question</button>
+            </div>
+        </div>
+
+        <!-- Complete section -->
+        <div class="section" id="completeSection" style="display:none;">
+            <h2>Interview Complete!</h2>
+            <div id="summary"></div>
+            <button onclick="location.reload()">Start New Interview</button>
+        </div>
+    </div>
+
+    <script>
+        // Global state
+        let sessionId = '';
+        let currentQuestionIndex = 0;
+        let pendingNextQuestion = '';  // pre-loaded next question from /api/answer response
+
+        // --- Speech Recognition ---
+        let recognition = null;
+        let isRecording = false;
+        let currentTranscript = '';
+
+        // Custom speech grammar — technical terms that the recognizer mangles
+        // Format: [misheard, correct_term] — applied AFTER transcription
+        const TECHNICAL_CORRECTIONS = [
+            ['love you', 'LabVIEW'],
+            ['ess eff two twenty two', 'RS-232'],
+            ['ess eff four twenty two', 'RS-422'],
+            ['ess eff', 'RS'],
+            ['mill eighty ten', 'MIL-STD-810'],
+            ['MIL STD', 'MIL-STD'],
+            ['I to C', 'I2C'],
+            ['eye two see', 'I2C'],
+            ['BME two eighty oh', 'BME280'],
+            ['BME two eighty', 'BME280'],
+            ['STM three two', 'STM32'],
+            ['sixty six volt', '66 V'],
+            ['three point three volts', '3.3 V'],
+            ['negative forty', '-40'],
+            ['py serial', 'pyserial'],
+            ['telemetry stream', 'telemetry stream'],  // keep as-is, verify
+            ['golden unit', 'golden unit'],
+            ['DMM', 'DMM'],
+            ['COM port', 'COM port'],
+            ['UART', 'UART'],
+            ['JTAG', 'JTAG'],
+            ['oscilloscope', 'oscilloscope'],
+        ];
+
+        // Build a custom speech grammar (SGML format) for Chrome
+        // This tells the recognizer about our technical vocabulary upfront
+        function buildGrammarString() {
+            const terms = TECHNICAL_CORRECTIONS.map(pair => pair[1]);
+            const extras = ['LabVIEW', 'RS-422', 'RS-232', 'I2C', 'UART', 'JTAG', 'BME280', 'STM32', 'MIL-STD-810', 'pyserial', 'pyserial library', 'golden unit', 'DMM', 'oscilloscope', 'telemetry'];
+            const allTerms = [...new Set([...terms, ...extras])];
+
+            let grammar = '<jsgf><rule id="tech_terms">';
+            for (const term of allTerms) {
+                grammar += `<one_of><item>${term}</item></one_of> `;
+            }
+            grammar += '</rule></jsgf>';
+            return grammar;
+        }
+
+        function correctTranscript(text) {
+            // Sort longest matches first so "ess eff four twenty two" beats "ess eff"
+            const sorted = [...TECHNICAL_CORRECTIONS].sort((a, b) => b[0].length - a[0].length);
+            let corrected = text;
+            for (const [misheard, correct] of sorted) {
+                // Case-insensitive substring replacement
+                corrected = corrected.replace(
+                    new RegExp(misheard.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'),
+                    correct
+                );
+            }
+            return corrected;
+        }
+
+        function initSpeechRecognition() {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRecognition) {
+                showVoiceStatus('Voice input unavailable in this browser. Use text mode.', 'err');
+                return;
+            }
+            recognition = new SpeechRecognition();
+            recognition.continuous = true;
+            recognition.interimResults = true;
+            recognition.lang = 'en-US';
+
+            // Try to set custom grammar (Chrome-only, ignored gracefully by others)
+            try {
+                const grammar = buildGrammarString();
+                const blob = new Blob([grammar], { type: 'text/xml' });
+                const grammarURL = URL.createObjectURL(blob);
+                recognition.grammar = grammarURL;  // non-standard, may be ignored
+            } catch (e) {
+                // Custom grammar not supported — post-processing will handle it
+            }
+
+            recognition.onresult = (event) => {
+                let interim = '';
+                let final = '';
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                    if (event.results[i].isFinal) {
+                        final += event.results[i][0].transcript;
+                    } else {
+                        interim += event.results[i][0].transcript;
+                    }
+                }
+                if (final) {
+                    // Apply technical corrections to final transcript
+                    const corrected = correctTranscript(final);
+                    currentTranscript += corrected + ' ';
+                    const area = document.getElementById('answer');
+                    area.value = currentTranscript;
+                }
+            };
+
+            recognition.onerror = (event) => {
+                if (event.error === 'not-allowed') {
+                    showVoiceStatus('Microphone permission denied. Use text mode.', 'err');
+                    stopListening();
+                } else if (event.error === 'no-speech') {
+                    // silent, just stop
+                    stopListening();
+                }
+            };
+
+            recognition.onend = () => {
+                if (isRecording) {
+                    try { recognition.start(); } catch(e) {}
+                }
+            };
+
+            showVoiceStatus('Voice input ready.', 'ok');
+        }
+
+        function startListening() {
+            if (!recognition) return;
+            currentTranscript = document.getElementById('answer').value + ' ';
+            isRecording = true;
+            try {
+                recognition.start();
+                document.getElementById('btnStartMic').style.display = 'none';
+                document.getElementById('btnStopMic').style.display = 'inline-block';
+                document.getElementById('btnStopMic').classList.add('recording');
+            } catch(e) {
+                showVoiceStatus('Could not start recording. Try again.', 'err');
+            }
+        }
+
+        function stopListening() {
+            isRecording = false;
+            if (recognition) {
+                try { recognition.stop(); } catch(e) {}
+            }
+            document.getElementById('btnStartMic').style.display = 'inline-block';
+            document.getElementById('btnStopMic').style.display = 'none';
+            document.getElementById('btnStopMic').classList.remove('recording');
+        }
+
+        function showVoiceStatus(msg, type) {
+            const el = document.getElementById('voiceStatus');
+            el.style.display = 'block';
+            el.textContent = msg;
+            el.className = 'voice-status ' + (type === 'ok' ? 'voice-ok' : 'voice-err');
+        }
+
+        // --- Speech Synthesis ---
+        function speakText(text) {
+            if (!window.speechSynthesis) return;
+            window.speechSynthesis.cancel();
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.rate = 1.0;
+            utterance.pitch = 1.0;
+            utterance.volume = 1.0;
+            window.speechSynthesis.speak(utterance);
+        }
+
+        // --- Interview Flow ---
+        async function startInterview() {
+            const jd = document.getElementById('jd').value;
+            const role = document.getElementById('role').value;
+            const mode = document.getElementById('mode').value;
+
+            if (!jd.trim()) {
+                alert('Please paste a job description');
+                return;
+            }
+
+            // Show loading state immediately
+            document.getElementById('startBtn').style.display = 'none';
+            document.getElementById('loadingMsg').style.display = 'block';
+
+            try {
+                const res = await fetch('/api/start', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        job_description: jd,
+                        role_title: role,
+                        mode: mode,
+                        duration_minutes: 20,
+                        interviewer_style: 'direct, evidence-seeking'
+                    })
+                });
+
+                if (!res.ok) {
+                    throw new Error('Server error: ' + res.status);
+                }
+
+                const data = await res.json();
+                sessionId = data.session_id;
+                currentQuestionIndex = 0;
+
+                // Switch to interview section
+                document.getElementById('setupSection').style.display = 'none';
+                document.getElementById('loadingMsg').style.display = 'none';
+                document.getElementById('interviewSection').style.display = 'block';
+                document.getElementById('question').textContent = data.question;
+                document.getElementById('status').textContent = 'Question 1';
+
+                // Speak the question out loud
+                speakText(data.question);
+
+                // Init speech recognition
+                initSpeechRecognition();
+            } catch (e) {
+                document.getElementById('loadingMsg').style.display = 'none';
+                document.getElementById('startBtn').style.display = 'block';
+                alert('Failed to start: ' + e.message);
+            }
+        }
+
+        async function submitAnswer() {
+            const answer = document.getElementById('answer').value;
+            if (!answer.trim()) return;
+
+            // Stop recording if active
+            if (isRecording) stopListening();
+
+            document.getElementById('submitBtn').disabled = true;
+
+            try {
+                const res = await fetch('/api/answer', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        session_id: sessionId,
+                        answer_text: answer
+                    })
+                });
+
+                const data = await res.json();
+                pendingNextQuestion = data.next_question || '';
+                showScore(data);
+            } catch (e) {
+                alert('Failed to submit: ' + e.message);
+                document.getElementById('submitBtn').disabled = false;
+            }
+        }
+
+        function showScore(data) {
+            document.getElementById('answerArea').style.display = 'none';
+            document.getElementById('scoreArea').style.display = 'block';
+
+            const scoreEl = document.getElementById('scoreDisplay');
+            scoreEl.textContent = data.score.overall + '/10';
+            scoreEl.className = 'score-display ' + (data.score.overall >= 6 ? 'score-good' : 'score-bad');
+
+            let html = '';
+            if (data.score.strong_points && data.score.strong_points.length) {
+                html += '<div class="feedback"><strong>Strong:</strong><ul>' +
+                    data.score.strong_points.map(p => '<li>' + p + '</li>').join('') + '</ul></div>';
+            }
+            if (data.score.weak_points && data.score.weak_points.length) {
+                html += '<div class="feedback"><strong>Weak:</strong><ul>' +
+                    data.score.weak_points.map(p => '<li>' + p + '</li>').join('') + '</ul></div>';
+            }
+            if (data.score.improved_answer) {
+                html += '<div class="feedback"><strong>Better answer:</strong> ' + data.score.improved_answer + '</div>';
+            }
+            document.getElementById('feedback').innerHTML = html;
+
+            if (data.needs_retry) {
+                document.getElementById('retryBtn').style.display = 'inline-block';
+                document.getElementById('nextBtn').style.display = 'none';
+                if (data.follow_up) {
+                    const fu = 'Follow-up: ' + data.follow_up;
+                    document.getElementById('feedback').innerHTML +=
+                        '<div class="feedback"><strong>Follow-up:</strong> ' + data.follow_up + '</div>';
+                    speakText(fu);
+                }
+            } else {
+                document.getElementById('retryBtn').style.display = 'none';
+                document.getElementById('nextBtn').style.display = 'inline-block';
+                if (data.status === 'complete') {
+                    const summary = 'Interview complete. Overall score: ' + data.score.overall + ' out of 10.';
+                    speakText(summary);
+                    showComplete();
+                    return;
+                }
+                // Save the next question — it was already returned by /api/answer
+                pendingNextQuestion = data.next_question || '';
+                if (pendingNextQuestion) {
+                    speakText('Next question: ' + pendingNextQuestion);
+                }
+            }
+        }
+
+        async function retryQuestion() {
+            stopListening();
+            document.getElementById('scoreArea').style.display = 'none';
+            document.getElementById('answerArea').style.display = 'block';
+            document.getElementById('answer').value = '';
+            document.getElementById('submitBtn').disabled = false;
+            document.getElementById('submitBtn').textContent = 'Submit Answer';
+            currentTranscript = '';
+        }
+
+        async function nextQuestion() {
+            stopListening();
+            document.getElementById('scoreArea').style.display = 'none';
+            document.getElementById('answerArea').style.display = 'block';
+            document.getElementById('answer').value = '';
+            document.getElementById('submitBtn').disabled = false;
+            currentTranscript = '';
+
+            // The next question was already returned in the /api/answer response
+            // No need to call /api/next — just show the pre-loaded question
+            if (pendingNextQuestion) {
+                currentQuestionIndex++;
+                document.getElementById('question').textContent = pendingNextQuestion;
+                document.getElementById('status').textContent = 'Question ' + (currentQuestionIndex + 1);
+                speakText(pendingNextQuestion);
+                pendingNextQuestion = '';
+            } else {
+                showComplete();
+            }
+        }
+
+        function showComplete() {
+            document.getElementById('interviewSection').style.display = 'none';
+            document.getElementById('completeSection').style.display = 'block';
+        }
+
+        // Check voice support on load
+        window.addEventListener('load', initSpeechRecognition);
+    </script>
+</body>
+</html>

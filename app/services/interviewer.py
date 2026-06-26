@@ -22,7 +22,10 @@ class InterviewerBrain:
         user_prompt = f"""JOB DESCRIPTION:
 {jd}
 
-ASK THE FIRST QUESTION. Ask only ONE question. Make it specific to the role requirements. Do not give advice or commentary — just ask the question."""
+Based ONLY on this job description, ask the first interview question.
+The question must directly relate to skills or requirements mentioned in the JD above.
+Do NOT ask about topics not covered in the JD.
+Ask only ONE question. Do not give advice or commentary — just ask the question."""
 
         response = await self.client.chat.completions.create(
             model=self.model,
@@ -30,7 +33,7 @@ ASK THE FIRST QUESTION. Ask only ONE question. Make it specific to the role requ
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
             ],
-            temperature=0.8,
+            temperature=0.3,
             max_tokens=200
         )
         content = response.choices[0].message.content
@@ -110,6 +113,44 @@ Keep it under 50 words. Be direct.
         followup = followup_content.strip() if followup_content else "Can you explain the technical architecture in more detail?"
         return score, followup
 
+    async def _generate_next_question(self, jd: str, mode: InterviewMode, style: str, question_index: int, answers: list) -> str:
+        """Generate the next interview question based on conversation history."""
+        # Build context from previous Q&A
+        context_lines = []
+        for i, ans in enumerate(answers):
+            q = ans.question_text if hasattr(ans, 'question_text') else f"Question {i+1}"
+            context_lines.append(f"Q{i+1}: {q}")
+            context_lines.append(f"A{i+1}: {ans.transcript}")
+
+        history = "\n".join(context_lines[-4:])  # Last 4 exchanges
+        if not history:
+            history = "No previous answers yet."
+
+        prompt = f"""JOB DESCRIPTION:
+{jd[:500]}
+
+CONVERSATION HISTORY (last {len(answers)} exchanges):
+{history}
+
+Generate the next interview question (#{question_index + 1}). It should:
+- Build on previous answers or explore a new area from the JD
+- Be more specific than the previous questions
+- Get at the candidate's actual hands-on experience
+
+Ask ONLY ONE question. Do not give advice or commentary."""
+
+        response = await self.client.chat.completions.create(
+            model=self.model,
+            messages=[
+                {"role": "system", "content": self._build_system_prompt(mode, style)},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.5,
+            max_tokens=200
+        )
+        content = response.choices[0].message.content
+        return content.strip() if content else "Tell me about a technical challenge you faced in your last role."
+
     async def generate_daily_practice_questions(self, jd: str, count: int, mode: InterviewMode) -> list[InterviewQuestion]:
         """Generate a set of practice questions for daily drills."""
         prompt = f"""
@@ -139,7 +180,7 @@ Questions should get progressively harder.
 Your style is: {style}.
 Ask one question at a time. Be direct. Challenge unsupported claims. Ask for specifics."""
 
-        if mode == InterviewMode.RECUITER_SCREEN:
+        if mode == InterviewMode.RECRUITER_SCREEN:
             base += " Focus on background, motivation, and role fit. Keep questions conversational."
         elif mode == InterviewMode.TECHNICAL_DEEP_DIVE:
             base += " Ask about architecture, implementation details, trade-offs, and failure modes."

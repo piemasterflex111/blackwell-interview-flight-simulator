@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interview Flight Simulator</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #0a0a0f;
+            color: #e0e0e0;
+            min-height: 100vh;
+        }
+        .container { max-width: 900px; margin: 0 auto; padding: 20px; }
+        h1 { text-align: center; padding: 30px 0 10px; font-size: 1.8em; color: #fff; }
+        .subtitle { text-align: center; color: #888; margin-bottom: 30px; }
+
+        /* Setup Screen */
+        #setup-screen { }
+        .form-group { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 6px; color: #aaa; font-size: 0.9em; }
+        textarea {
+            width: 100%; height: 180px; background: #141420; color: #e0e0e0;
+            border: 1px solid #2a2a3a; border-radius: 8px; padding: 12px;
+            font-family: inherit; font-size: 0.95em; resize: vertical;
+        }
+        select {
+            width: 100%; padding: 10px; background: #141420; color: #e0e0e0;
+            border: 1px solid #2a2a3a; border-radius: 8px; font-size: 1em;
+        }
+        .mode-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 6px; }
+        .mode-option {
+            padding: 12px; background: #141420; border: 2px solid #2a2a3a;
+            border-radius: 8px; cursor: pointer; text-align: center; transition: all 0.2s;
+        }
+        .mode-option:hover { border-color: #4a4a6a; }
+        .mode-option.selected { border-color: #5b8def; background: #1a1a30; }
+        .mode-option .title { font-weight: 600; margin-bottom: 4px; }
+        .mode-option .desc { font-size: 0.8em; color: #888; }
+        button.primary {
+            width: 100%; padding: 14px; background: #5b8def; color: white;
+            border: none; border-radius: 8px; font-size: 1.1em; cursor: pointer;
+            font-weight: 600; transition: background 0.2s;
+        }
+        button.primary:hover { background: #4a7de6; }
+        button.primary:disabled { background: #333; color: #666; cursor: not-allowed; }
+
+        /* Interview Screen */
+        #interview-screen { display: none; }
+        .score-bar {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 12px 16px; background: #141420; border-radius: 8px;
+            margin-bottom: 20px; border: 1px solid #2a2a3a;
+        }
+        .score-bar .label { color: #888; font-size: 0.85em; }
+        .score-bar .score { font-size: 1.5em; font-weight: 700; }
+        .score-bar .score.excellent { color: #4caf50; }
+        .score-bar .score.good { color: #8bc34a; }
+        .score-bar .score.fair { color: #ff9800; }
+        .score-bar .score.weak { color: #f44336; }
+        .phase-indicator { text-align: center; margin-bottom: 10px; }
+        .phase-dot {
+            display: inline-block; width: 10px; height: 10px; border-radius: 50%;
+            margin: 0 4px; background: #333;
+        }
+        .phase-dot.active { background: #5b8def; box-shadow: 0 0 6px #5b8def80; }
+        .phase-dot.done { background: #4caf50; }
+
+        .chat-area {
+            background: #141420; border: 1px solid #2a2a3a; border-radius: 8px;
+            padding: 16px; min-height: 300px; max-height: 500px; overflow-y: auto;
+            margin-bottom: 16px;
+        }
+        .message { margin-bottom: 16px; }
+        .message.interviewer { padding-left: 16px; border-left: 3px solid #5b8def; }
+        .message.candidate { padding-right: 16px; border-right: 3px solid #4caf50; text-align: right; }
+        .message.system { color: #888; font-style: italic; text-align: center; border: none; }
+        .message.interruption { padding-left: 16px; border-left: 3px solid #ff9800; background: #1a1500; border-radius: 4px; padding: 8px 12px; }
+        .message .speaker { font-weight: 600; font-size: 0.8em; text-transform: uppercase; margin-bottom: 4px; color: #5b8def; }
+        .message.candidate .speaker { color: #4caf50; }
+        .message.interruption .speaker { color: #ff9800; }
+        .message .text { line-height: 1.5; }
+        .score-inline { font-size: 0.85em; margin-top: 6px; padding: 4px 8px; background: #1a1a30; border-radius: 4px; display: inline-block; }
+
+        .input-area {
+            display: flex; gap: 10px; align-items: center;
+        }
+        .text-input {
+            flex: 1; padding: 12px; background: #141420; color: #e0e0e0;
+            border: 1px solid #2a2a3a; border-radius: 8px; font-size: 1em;
+        }
+        .text-input:focus { outline: none; border-color: #5b8def; }
+        .btn-icon {
+            padding: 12px 16px; background: #141420; color: #e0e0e0;
+            border: 1px solid #2a2a3a; border-radius: 8px; cursor: pointer;
+            font-size: 1.2em; transition: all 0.2s;
+        }
+        .btn-icon:hover { background: #1a1a30; border-color: #4a4a6a; }
+        .btn-icon.recording { background: #3a0000; border-color: #f44336; animation: pulse 1s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+
+        .action-row { display: flex; gap: 10px; margin-top: 10px; }
+        .action-row button {
+            flex: 1; padding: 10px; background: #141420; color: #aaa;
+            border: 1px solid #2a2a3a; border-radius: 8px; cursor: pointer;
+            font-size: 0.9em;
+        }
+        .action-row button:hover { background: #1a1a30; color: #fff; }
+
+        /* Results Screen */
+        #results-screen { display: none; }
+        .result-card {
+            background: #141420; border: 1px solid #2a2a3a; border-radius: 8px;
+            padding: 20px; margin-bottom: 16px;
+        }
+        .result-card h3 { margin-bottom: 10px; color: #fff; }
+        .result-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .result-stat { text-align: center; padding: 12px; background: #0a0a15; border-radius: 6px; }
+        .result-stat .num { font-size: 1.8em; font-weight: 700; }
+        .result-stat .lbl { font-size: 0.8em; color: #888; margin-top: 4px; }
+        .feedback-item { padding: 10px; border-left: 3px solid #5b8def; margin: 8px 0; background: #0a0a15; border-radius: 0 4px 4px 0; }
+        .feedback-item.weak { border-color: #f44336; }
+        .feedback-item.strong { border-color: #4caf50; }
+        .feedback-item .topic { font-weight: 600; margin-bottom: 4px; }
+        .feedback-item .detail { font-size: 0.9em; color: #aaa; }
+        .result-actions { display: flex; gap: 10px; margin-top: 20px; }
+        .result-actions button {
+            flex: 1; padding: 14px; border-radius: 8px; font-size: 1em;
+            font-weight: 600; cursor: pointer; border: none;
+        }
+        .btn-new { background: #5b8def; color: white; }
+        .btn-review { background: #141420; color: #aaa; border: 1px solid #2a2a3a !important; }
+
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Interview Flight Simulator</h1>
+        <p class="subtitle">Practice. Get scored. Retry weak answers.</p>
+
+        <!-- SETUP SCREEN -->
+        <div id="setup-screen">
+            <div class="form-group">
+                <label>Job Description (paste the key requirements)</label>
+                <textarea id="jd-input" placeholder="Paste job description or key requirements here..."></textarea>
+            </div>
+            <div class="form-group">
+                <label>Interview Mode</label>
+                <div class="mode-grid">
+                    <div class="mode-option selected" data-mode="recruiter" onclick="selectMode(this)">
+                        <div class="title">Recruiter</div>
+                        <div class="desc">Screen call, background, motivation</div>
+                    </div>
+                    <div class="mode-option" data-mode="hiring_manager" onclick="selectMode(this)">
+                        <div class="title">Hiring Manager</div>
+                        <div class="desc">Role fit, team dynamics, scenarios</div>
+                    </div>
+                    <div class="mode-option" data-mode="technical" onclick="selectMode(this)">
+                        <div class="title">Technical</div>
+                        <div class="desc">Deep dive,系统设计, debugging</div>
+                    </div>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Difficulty</label>
+                <select id="difficulty">
+                    <option value="standard">Standard</option>
+                    <option value="aggressive">Aggressive (more interruptions, harder follow-ups)</option>
+                </select>
+            </div>
+            <button class="primary" id="start-btn" onclick="startInterview()">Start Interview</button>
+        </div>
+
+        <!-- INTERVIEW SCREEN -->
+        <div id="interview-screen">
+            <div class="phase-indicator">
+                <span class="phase-dot active" id="phase-0"></span>
+                <span class="phase-dot" id="phase-1"></span>
+                <span class="phase-dot" id="phase-2"></span>
+                <span class="phase-dot" id="phase-3"></span>
+            </div>
+            <div class="score-bar">
+                <span class="label">Live Score</span>
+                <span class="score" id="live-score">—</span>
+                <span class="label" id="question-count">Q: 0</span>
+            </div>
+            <div class="chat-area" id="chat-area"></div>
+            <div class="input-area">
+                <button class="btn-icon" id="mic-btn" onclick="toggleMic()" title="Voice input">🎤</button>
+                <input type="text" class="text-input" id="text-input" placeholder="Type your answer or press mic..." onkeypress="handleInputKey(event)">
+                <button class="btn-icon" id="send-btn" onclick="sendAnswer()" title="Send">➤</button>
+            </div>
+            <div class="action-row">
+                <button onclick="endInterview()">End Interview</button>
+                <button onclick="skipQuestion()">Skip Question</button>
+            </div>
+        </div>
+
+        <!-- RESULTS SCREEN -->
+        <div id="results-screen">
+            <div class="result-card">
+                <h3>Session Complete</h3>
+                <div class="result-grid">
+                    <div class="result-stat"><div class="num" id="final-score">—</div><div class="lbl">Overall Score</div></div>
+                    <div class="result-stat"><div class="num" id="total-questions">0</div><div class="lbl">Questions</div></div>
+                    <div class="result-stat"><div class="num" id="avg-score">—</div><div class="lbl">Avg Score</div></div>
+                    <div class="result-stat"><div class="num" id="duration">—</div><div class="lbl">Duration</div></div>
+                </div>
+            </div>
+            <div class="result-card">
+                <h3>Topic Breakdown</h3>
+                <div id="topic-breakdown"></div>
+            </div>
+            <div class="result-card">
+                <h3>Key Feedback</h3>
+                <div id="key-feedback"></div>
+            </div>
+            <div class="result-actions">
+                <button class="btn-new" onclick="newInterview()">New Interview</button>
+                <button class="btn-review" onclick="viewSessionFiles()">View Session Files</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+        let sessionId = null;
+        let selectedMode = 'recruiter';
+        let currentScore = 0;
+        let questionCount = 0;
+        let scores = [];
+        let isRecording = false;
+        let recognition = null;
+        let interviewStart = null;
+
+        // SETUP
+        function selectMode(el) {
+            document.querySelectorAll('.mode-option').forEach(e => e.classList.remove('selected'));
+            el.classList.add('selected');
+            selectedMode = el.dataset.mode;
+        }
+
+        async function startInterview() {
+            const jd = document.getElementById('jd-input').value.trim();
+            const difficulty = document.getElementById('difficulty').value;
+            if (!jd) { alert('Please paste a job description.'); return; }
+
+            document.getElementById('start-btn').disabled = true;
+            document.getElementById('start-btn').textContent = 'Starting...';
+
+            try {
+                const resp = await fetch('/api/sessions', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        job_description: jd,
+                        mode: selectedMode,
+                        difficulty: difficulty
+                    })
+                });
+                const data = await resp.json();
+                sessionId = data.session_id;
+                interviewStart = Date.now();
+
+                document.getElementById('setup-screen').style.display = 'none';
+                document.getElementById('interview-screen').style.display = 'block';
+
+                connectWebSocket();
+            } catch (e) {
+                console.error(e);
+                alert('Failed to start. Check console.');
+                document.getElementById('start-btn').disabled = false;
+                document.getElementById('start-btn').textContent = 'Start Interview';
+            }
+        }
+
+        // WEBSOCKET
+        function connectWebSocket() {
+            const wsUrl = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws/${sessionId}`;
+            ws = new WebSocket(wsUrl);
+
+            ws.onopen = () => addMessage('system', 'Interview started. The interviewer will ask you questions.');
+            ws.onmessage = (e) => handleWSMessage(JSON.parse(e.data));
+            ws.onerror = (e) => addMessage('system', 'Connection error.');
+            ws.onclose = () => addMessage('system', 'Connection closed.');
+        }
+
+        function handleWSMessage(msg) {
+            switch (msg.type) {
+                case 'question':
+                    addMessage('interviewer', msg.content);
+                    break;
+                case 'score':
+                    questionCount++;
+                    scores.push(msg.score);
+                    currentScore = msg.score;
+                    updateScore(msg.score);
+                    addMessage('system', `Score: ${msg.score}/10 — ${msg.feedback || ''}`);
+                    break;
+                case 'interruption':
+                    addMessage('interruption', msg.message);
+                    break;
+                case 'end':
+                    endInterview();
+                    break;
+            }
+        }
+
+        function addMessage(type, text) {
+            const chat = document.getElementById('chat-area');
+            const div = document.createElement('div');
+            div.className = `message ${type}`;
+            const speakerMap = { interviewer: 'Interviewer', candidate: 'You', system: 'System', interruption: '⚡ Interruption' };
+            div.innerHTML = `<div class="speaker">${speakerMap[type] || type}</div><div class="text">${text}</div>`;
+            chat.appendChild(div);
+            chat.scrollTop = chat.scrollHeight;
+        }
+
+        function updateScore(score) {
+            const el = document.getElementById('live-score');
+            el.textContent = `${score}/10`;
+            el.className = 'score ' + (score >= 8 ? 'excellent' : score >= 6 ? 'good' : score >= 4 ? 'fair' : 'weak');
+            document.getElementById('question-count').textContent = `Q: ${questionCount}`;
+        }
+
+        // INPUT
+        function sendAnswer() {
+            const input = document.getElementById('text-input');
+            const text = input.value.trim();
+            if (!text || !ws) return;
+            addMessage('candidate', text);
+            ws.send(JSON.stringify({ type: 'answer', content: text }));
+            input.value = '';
+        }
+
+        function handleInputKey(e) {
+            if (e.key === 'Enter') sendAnswer();
+        }
+
+        // VOICE
+        function toggleMic() {
+            if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+                alert('Speech recognition not supported in this browser. Use Chrome.');
+                return;
+            }
+            if (isRecording) {
+                recognition.stop();
+            } else {
+                const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+                recognition = new SR();
+                recognition.continuous = true;
+                recognition.interimResults = true;
+                recognition.lang = 'en-US';
+                recognition.onresult = (e) => {
+                    let final = '';
+                    for (let i = e.resultIndex; i < e.results.length; i++) {
+                        if (e.results[i].isFinal) final += e.results[i][0].transcript;
+                    }
+                    if (final) document.getElementById('text-input').value += final;
+                };
+                recognition.onend = () => {
+                    isRecording = false;
+                    document.getElementById('mic-btn').classList.remove('recording');
+                };
+                recognition.onerror = (e) => {
+                    console.error('Speech error:', e.error);
+                    isRecording = false;
+                    document.getElementById('mic-btn').classList.remove('recording');
+                };
+                recognition.start();
+                isRecording = true;
+                document.getElementById('mic-btn').classList.add('recording');
+            }
+        }
+
+        // ACTIONS
+        function skipQuestion() {
+            if (ws) ws.send(JSON.stringify({ type: 'skip' }));
+            addMessage('system', 'Skipped.');
+        }
+
+        function endInterview() {
+            if (ws) ws.close();
+            showResults();
+        }
+
+        function showResults() {
+            document.getElementById('interview-screen').style.display = 'none';
+            document.getElementById('results-screen').style.display = 'block';
+
+            const avg = scores.length ? (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1) : '—';
+            const dur = interviewStart ? Math.round((Date.now() - interviewStart) / 60000) : '—';
+
+            document.getElementById('final-score').textContent = avg;
+            document.getElementById('total-questions').textContent = scores.length;
+            document.getElementById('avg-score').textContent = avg;
+            document.getElementById('duration').textContent = `${dur} min`;
+        }
+
+        function newInterview() {
+            location.reload();
+        }
+
+        function viewSessionFiles() {
+            const url = `/api/sessions/${sessionId}`;
+            window.open(url, '_blank');
+        }
+    </script>
+</body>
+</html>

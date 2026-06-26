@@ -132,13 +132,82 @@
             ['three point three volts', '3.3 V'],
             ['negative forty', '-40'],
             ['py serial', 'pyserial'],
-            ['telemetry stream', 'telemetry stream'],  // keep as-is, verify
-            ['golden unit', 'golden unit'],
-            ['DMM', 'DMM'],
-            ['COM port', 'COM port'],
-            ['UART', 'UART'],
-            ['JTAG', 'JTAG'],
-            ['oscilloscope', 'oscilloscope'],
+            ['py test', 'pytest'],
+            ['pie test', 'pytest'],
+            ['fast API', 'FastAPI'],
+            ['fast a p i', 'FastAPI'],
+            ['SQL Alchemy', 'SQLAlchemy'],
+            ['ess l', 'SQL'],
+            ['you are tea', 'UART'],
+            ['eye are', 'UART'],
+            ['jay tag', 'JTAG'],
+            ['jay ag', 'JTAG'],
+            ['eye D', 'ID'],
+            ['eye P', 'IP'],
+            ['tee c p', 'TCP'],
+            ['you d p', 'UDP'],
+            ['c n', 'CAN'],
+            ['see a n', 'CAN'],
+            ['d b', 'DB'],
+            ['gee i', 'GI'],
+            ['g e', 'GE'],
+            ['a i', 'AI'],
+            ['a p i', 'API'],
+            ['j a r', 'JAR'],
+            ['g i t', 'Git'],
+            ['g h', 'GH'],
+            ['a d c', 'ADC'],
+            ['d a c', 'DAC'],
+            ['p d m', 'PDM'],
+            ['p w m', 'PWM'],
+            ['d m m', 'DMM'],
+            ['d u t', 'DUT'],
+            ['s c p', 'SCP'],
+            ['s s h', 'SSH'],
+            ['f t p', 'FTP'],
+            ['n v m e', 'NVMe'],
+            ['s s d', 'SSD'],
+            ['h d d', 'HDD'],
+            ['c p u', 'CPU'],
+            ['g p u', 'GPU'],
+            ['r a m', 'RAM'],
+            ['r o m', 'ROM'],
+            ['f l a s h', 'Flash'],
+            ['m b', 'MB'],
+            ['g b', 'GB'],
+            ['t b', 'TB'],
+            ['k b', 'KB'],
+            ['m h z', 'MHz'],
+            ['g h z', 'GHz'],
+            ['k h z', 'kHz'],
+            ['b p s', 'bps'],
+            ['m b p s', 'Mbps'],
+            ['g b p s', 'Gbps'],
+            ['i p v four', 'IPv4'],
+            ['i p v six', 'IPv6'],
+            ['d n s', 'DNS'],
+            ['h t t p', 'HTTP'],
+            ['h t t p s', 'HTTPS'],
+            ['o a u t h', 'OAuth'],
+            ['j w t', 'JWT'],
+            ['s a m l', 'SAML'],
+            ['d o c k e r', 'Docker'],
+            ['k u b e r n e t e s', 'Kubernetes'],
+            ['p y p i', 'PyPI'],
+            ['p o d m a n', 'podman'],
+            ['s c a n n y', 'scanny'],
+            ['y a m l', 'YAML'],
+            ['j s o n', 'JSON'],
+            ['x m l', 'XML'],
+            ['h t m l', 'HTML'],
+            ['c s s', 'CSS'],
+            ['j s', 'JS'],
+            ['t s', 'TS'],
+            ['p y', 'PY'],
+            ['n o de', 'Node'],
+            ['n p m', 'NPM'],
+            ['p n p m', 'pnpm'],
+            ['y a r n', 'Yarn'],
         ];
 
         // Build a custom speech grammar (SGML format) for Chrome
@@ -327,11 +396,14 @@
         }
 
         async function submitAnswer() {
-            const answer = document.getElementById('answer').value;
+            let answer = document.getElementById('answer').value;
             if (!answer.trim()) return;
 
             // Stop recording if active
             if (isRecording) stopListening();
+
+            // Apply technical corrections to the final text before sending
+            answer = correctTranscript(answer);
 
             document.getElementById('submitBtn').disabled = true;
 

@@ -155,7 +155,7 @@
             <div class="form-group">
                 <label>Interview Mode</label>
                 <div class="mode-grid">
-                    <div class="mode-option selected" data-mode="recruiter" onclick="selectMode(this)">
+                    <div class="mode-option selected" data-mode="recruiter_screen" onclick="selectMode(this)">
                         <div class="title">Recruiter</div>
                         <div class="desc">Screen call, background, motivation</div>
                     </div>
@@ -163,7 +163,7 @@
                         <div class="title">Hiring Manager</div>
                         <div class="desc">Role fit, team dynamics, scenarios</div>
                     </div>
-                    <div class="mode-option" data-mode="technical" onclick="selectMode(this)">
+                    <div class="mode-option" data-mode="technical_deep_dive" onclick="selectMode(this)">
                         <div class="title">Technical</div>
                         <div class="desc">Deep dive,系统设计, debugging</div>
                     </div>
@@ -272,7 +272,7 @@
 
         let ws = null;
         let sessionId = null;
-        let selectedMode = 'recruiter';
+        let selectedMode = 'recruiter_screen';
         let currentScore = 0;
         let questionCount = 0;
         let scores = [];

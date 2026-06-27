@@ -69,6 +69,7 @@ app = FastAPI(
 # ── Static files ────────────────────────────────────────────────────────
 
 BASE_DIR = os.path.dirname(__file__)
+TEMPLATES_DIR = os.path.join(BASE_DIR, "templates")
 STATIC_DIR = os.path.join(BASE_DIR, "static")
 if os.path.isdir(STATIC_DIR):
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
@@ -78,7 +79,7 @@ if os.path.isdir(STATIC_DIR):
 async def index():
     """Serve the browser UI."""
     return FileResponse(
-        os.path.join(STATIC_DIR, "index.html"),
+        os.path.join(TEMPLATES_DIR, "index.html"),
         media_type="text/html"
     )
 

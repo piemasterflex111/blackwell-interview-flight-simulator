@@ -369,21 +369,30 @@
 
         function handleWSMessage(msg) {
             switch (msg.type) {
-                case 'question':
-                    addMessage('interviewer', msg.content);
-                    break;
-                case 'score':
+                case 'session_start':
+                    addMessage('interviewer', msg.question);
                     questionCount++;
-                    scores.push(msg.score);
-                    currentScore = msg.score;
-                    updateScore(msg.score);
-                    addMessage('system', `Score: ${msg.score}/10 — ${msg.feedback || ''}`);
+                    updateQuestionCount();
                     break;
-                case 'interruption':
-                    addMessage('interruption', msg.message);
+                case 'next_question':
+                    addMessage('interviewer', msg.question);
+                    questionCount++;
+                    updateQuestionCount();
                     break;
-                case 'end':
+                case 'retry':
+                    scores.push(msg.score.overall);
+                    currentScore = msg.score.overall;
+                    updateScore(msg.score.overall);
+                    addMessage('system', `Score: ${msg.score.overall}/10 — ${msg.score.feedback || ''}`);
+                    if (msg.follow_up) {
+                        addMessage('interviewer', 'Try again. Hint: ' + msg.follow_up);
+                    }
+                    break;
+                case 'session_complete':
                     endInterview();
+                    break;
+                default:
+                    console.log('Unhandled WS message type:', msg.type, msg);
                     break;
             }
         }
@@ -396,6 +405,10 @@
             div.innerHTML = `<div class="speaker">${speakerMap[type] || type}</div><div class="text">${text}</div>`;
             chat.appendChild(div);
             chat.scrollTop = chat.scrollHeight;
+        }
+
+        function updateQuestionCount() {
+            document.getElementById('question-count').textContent = `Q: ${questionCount}`;
         }
 
         function updateScore(score) {

@@ -90,9 +90,14 @@ async def start_session(req: StartSessionRequest):
     """Start a new interview session. Returns first question."""
     try:
         session_id = session_mgr.create_session_id()
+        # Combine job description with optional story context
+        context = req.job_description
+        if req.story_context:
+            context += "\n\nSTORY CONTEXT:\n" + req.story_context
+
         state = SessionState(
             session_id=session_id,
-            job_description=req.job_description,
+            job_description=context,
             role_title=req.role_title,
             mode=req.mode,
             interviewer_style=req.interviewer_style,
@@ -102,7 +107,7 @@ async def start_session(req: StartSessionRequest):
 
         try:
             question = await interviewer.generate_opening_question(
-                req.job_description, req.mode, req.interviewer_style
+                context, req.mode, req.interviewer_style
             )
         except Exception as e:
             logger.error("LLM failed to generate opening question: %s", e)

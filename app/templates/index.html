@@ -143,7 +143,13 @@
         <!-- SETUP SCREEN -->
         <div id="setup-screen">
             <div class="form-group">
-                <label>Job Description (paste the key requirements)</label>
+                <label>Quick Start — Pick a Story (optional)</label>
+                <select id="story-select">
+                    <option value="">— Select a story to load —</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Job Description (paste requirements, or auto-filled from story)</label>
                 <textarea id="jd-input" placeholder="Paste job description or key requirements here..."></textarea>
             </div>
             <div class="form-group">
@@ -225,6 +231,45 @@
     </div>
 
     <script>
+        // Pre-loaded work stories — pick one from the dropdown
+        const STORIES = [
+            {
+                id: '16_lane_station',
+                title: '16-Lane Parallel Telemetry Station',
+                company: 'Terran Orbital',
+                prompt: '16-lane parallel telemetry acquisition station for spacecraft battery module qualification. Python, pyserial, RS-422, parallel UART communication, real-time data acquisition, logging, automated test sequencing.',
+                context: 'Designed and built a 16-lane parallel telemetry station. Python + pyserial for RS-422 communication. Acquired, logged, and validated telemetry from 16 battery modules simultaneously.'
+            },
+            {
+                id: 'rx_tx_debug',
+                title: 'RX/TX Reversed Wiring Debug',
+                company: 'Terran Orbital',
+                prompt: 'COM port mapping issue — RS-422 RX/TX lines reversed between fixture and DUT. Diagnosed with oscilloscope, traced wiring, corrected fixture pinout.',
+                context: 'Debugged communication failure between test fixture and device under test. Used oscilloscope to trace RS-422 signals, found RX/TX reversal in wiring harness.'
+            },
+            {
+                id: 'firmware_debug',
+                title: 'Firmware HEX Mismatch Debug',
+                company: 'Terran Orbital',
+                prompt: 'Firmware validation — HEX file checksum mismatch during programming. Root cause analysis across build pipeline, discovered source of corruption.',
+                context: 'Debugged firmware programming failures where HEX files produced checksum errors. Traced issue through build chain to identify corruption source.'
+            },
+            {
+                id: 'qualification_test',
+                title: 'MIL-STD-810 Qualification Testing',
+                company: 'Mercury Systems',
+                prompt: 'MIL-STD-810 environmental qualification testing for spacecraft electronics. Vibration, thermal cycling, altitude testing protocols.',
+                context: 'Executed MIL-STD-810 environmental qualification tests on spacecraft electronic assemblies. Vibration, thermal cycling, altitude protocols.'
+            },
+            {
+                id: 'firmware_validation',
+                title: 'Embedded Firmware Validation',
+                company: 'Gatekeeper',
+                prompt: 'Embedded firmware validation and functional testing for space-grade hardware. Automated test sequences, pass/fail criteria, regression testing.',
+                context: 'Validated embedded firmware for space-grade hardware. Built automated test sequences with pass/fail criteria and regression test suites.'
+            }
+        ];
+
         let ws = null;
         let sessionId = null;
         let selectedMode = 'recruiter';
@@ -234,6 +279,31 @@
         let isRecording = false;
         let recognition = null;
         let interviewStart = null;
+        let selectedStory = null;
+
+        // Populate story dropdown
+        function populateStories() {
+            const sel = document.getElementById('story-select');
+            STORIES.forEach(s => {
+                const opt = document.createElement('option');
+                opt.value = s.id;
+                opt.textContent = `${s.title} (${s.company})`;
+                sel.appendChild(opt);
+            });
+            sel.addEventListener('change', onStorySelect);
+        }
+
+        function onStorySelect() {
+            const sel = document.getElementById('story-select');
+            const sid = sel.value;
+            const story = STORIES.find(s => s.id === sid);
+            if (story) {
+                selectedStory = story;
+                document.getElementById('jd-input').value = story.prompt;
+            } else {
+                selectedStory = null;
+            }
+        }
 
         // SETUP
         function selectMode(el) {
@@ -245,20 +315,27 @@
         async function startInterview() {
             const jd = document.getElementById('jd-input').value.trim();
             const difficulty = document.getElementById('difficulty').value;
-            if (!jd) { alert('Please paste a job description.'); return; }
+            if (!jd) { alert('Please paste a job description or select a story.'); return; }
 
             document.getElementById('start-btn').disabled = true;
             document.getElementById('start-btn').textContent = 'Starting...';
 
+            const body = {
+                job_description: jd,
+                mode: selectedMode,
+                difficulty: difficulty,
+            };
+
+            // Attach story context if a story was selected
+            if (selectedStory) {
+                body.story_context = selectedStory.context;
+            }
+
             try {
-                const resp = await fetch('/api/sessions', {
+                const resp = await fetch('/api/start', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        job_description: jd,
-                        mode: selectedMode,
-                        difficulty: difficulty
-                    })
+                    body: JSON.stringify(body)
                 });
                 const data = await resp.json();
                 sessionId = data.session_id;
@@ -275,6 +352,9 @@
                 document.getElementById('start-btn').textContent = 'Start Interview';
             }
         }
+
+        // Initialize on load
+        document.addEventListener('DOMContentLoaded', populateStories);
 
         // WEBSOCKET
         function connectWebSocket() {

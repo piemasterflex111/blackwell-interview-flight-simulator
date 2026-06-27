@@ -70,6 +70,7 @@ class StartSessionRequest(BaseModel):
     mode: InterviewMode = InterviewMode.TECHNICAL_DEEP_DIVE
     interviewer_style: str = "direct"
     duration_minutes: int = 15
+    story_context: Optional[str] = None
 
 
 class AnswerRequest(BaseModel):
